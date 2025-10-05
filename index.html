@@ -466,11 +466,25 @@
         const notification = document.getElementById('notification');
         const teamFilter = document.getElementById('teamFilter');
         
-        // Initialize with empty database
+        // Load teams from localStorage on page load
         document.addEventListener('DOMContentLoaded', function() {
+            loadTeamsFromStorage();
             updateTeamsList();
             updateTeamFilter();
         });
+        
+        // Save teams to localStorage
+        function saveTeamsToStorage() {
+            localStorage.setItem('ipTeamMatcherTeams', JSON.stringify(teamsDatabase));
+        }
+        
+        // Load teams from localStorage
+        function loadTeamsFromStorage() {
+            const storedTeams = localStorage.getItem('ipTeamMatcherTeams');
+            if (storedTeams) {
+                teamsDatabase = JSON.parse(storedTeams);
+            }
+        }
         
         // Add or update team
         addTeamBtn.addEventListener('click', function() {
@@ -515,6 +529,9 @@
                 teamsDatabase.push(newTeam);
                 showNotification(`Team "${teamName}" added`, 'success');
             }
+            
+            // Save to localStorage
+            saveTeamsToStorage();
             
             // Clear inputs
             teamNameInput.value = '';
@@ -590,6 +607,8 @@
         function deleteTeam(teamId) {
             if (confirm('Are you sure you want to delete this team?')) {
                 teamsDatabase = teamsDatabase.filter(team => team.id !== teamId);
+                // Save to localStorage
+                saveTeamsToStorage();
                 updateTeamsList();
                 updateTeamFilter();
                 showNotification('Team deleted', 'success');
@@ -602,6 +621,8 @@
                 teamsDatabase = [];
                 currentResults = {};
                 editingTeamId = null;
+                // Clear localStorage
+                localStorage.removeItem('ipTeamMatcherTeams');
                 updateTeamsList();
                 updateTeamFilter();
                 outputResults.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Run a match to see results</p></div>';
