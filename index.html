@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IP Team Matcher</title>
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -347,6 +348,68 @@
         .notification.error {
             background: var(--warning);
         }
+
+        /* History Panel Styles */
+        .history-panel {
+            margin-top: 20px;
+        }
+
+        .history-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: var(--border-radius);
+            margin-top: 10px;
+        }
+
+        .history-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-item:hover {
+            background: #f8f9fa;
+        }
+
+        .history-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .history-date {
+            font-size: 0.8rem;
+            color: var(--secondary);
+        }
+
+        .history-stats {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .history-empty {
+            text-align: center;
+            padding: 20px;
+            color: var(--secondary);
+        }
+
+        .history-empty i {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            color: #dee2e6;
+        }
     </style>
 </head>
 <body>
@@ -437,6 +500,27 @@
                         </button>
                     </div>
                 </div>
+                
+                <!-- History Panel -->
+                <div class="history-panel">
+                    <div class="card-header">
+                        <h2 class="card-title"><i class="fas fa-history"></i> Search History</h2>
+                        <span class="badge" id="historyStats">0</span>
+                    </div>
+                    
+                    <div class="history-list" id="historyList">
+                        <div class="history-empty">
+                            <i class="fas fa-clock"></i>
+                            <p>No search history yet</p>
+                        </div>
+                    </div>
+                    
+                    <div class="actions">
+                        <button class="btn btn-outline" id="clearHistoryBtn">
+                            <i class="fas fa-trash"></i> Clear History
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -448,6 +532,7 @@
         let teamsDatabase = [];
         let currentResults = {};
         let editingTeamId = null;
+        let searchHistory = [];
         
         // DOM Elements
         const teamNameInput = document.getElementById('teamName');
@@ -465,12 +550,17 @@
         const resetResultsBtn = document.getElementById('resetResultsBtn');
         const notification = document.getElementById('notification');
         const teamFilter = document.getElementById('teamFilter');
+        const historyList = document.getElementById('historyList');
+        const historyStats = document.getElementById('historyStats');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
         
-        // Load teams from localStorage on page load
+        // Load teams and history from localStorage on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadTeamsFromStorage();
+            loadHistoryFromStorage();
             updateTeamsList();
             updateTeamFilter();
+            updateHistoryList();
         });
         
         // Save teams to localStorage
@@ -483,6 +573,19 @@
             const storedTeams = localStorage.getItem('ipTeamMatcherTeams');
             if (storedTeams) {
                 teamsDatabase = JSON.parse(storedTeams);
+            }
+        }
+        
+        // Save history to localStorage
+        function saveHistoryToStorage() {
+            localStorage.setItem('ipTeamMatcherHistory', JSON.stringify(searchHistory));
+        }
+        
+        // Load history from localStorage
+        function loadHistoryFromStorage() {
+            const storedHistory = localStorage.getItem('ipTeamMatcherHistory');
+            if (storedHistory) {
+                searchHistory = JSON.parse(storedHistory);
             }
         }
         
@@ -809,11 +912,98 @@
                 }
             }
             
+            // Add to search history
+            addToHistory(ipData, matchedIPs, totalIPs);
+            
             const selectedTeam = teamFilter.value;
             displayResults(currentResults, selectedTeam);
             matchStats.textContent = `${matchedIPs}/${totalIPs}`;
             showNotification(`Matched ${matchedIPs} of ${totalIPs} IPs`, 'success');
         });
+        
+        // Add search to history
+        function addToHistory(ipData, matchedIPs, totalIPs) {
+            const now = new Date();
+            const historyEntry = {
+                id: searchHistory.length > 0 ? Math.max(...searchHistory.map(h => h.id)) + 1 : 1,
+                timestamp: now.getTime(),
+                date: now.toLocaleDateString(),
+                time: now.toLocaleTimeString(),
+                ipData: ipData,
+                matchedIPs: matchedIPs,
+                totalIPs: totalIPs
+            };
+            
+            searchHistory.unshift(historyEntry);
+            
+            // Keep only the last 10 entries
+            if (searchHistory.length > 10) {
+                searchHistory = searchHistory.slice(0, 10);
+            }
+            
+            saveHistoryToStorage();
+            updateHistoryList();
+        }
+        
+        // Load history entry
+        function loadHistoryEntry(historyId) {
+            const entry = searchHistory.find(h => h.id === historyId);
+            if (entry) {
+                ipInput.value = entry.ipData;
+                showNotification('History entry loaded', 'success');
+            }
+        }
+        
+        // Delete history entry
+        function deleteHistoryEntry(historyId) {
+            searchHistory = searchHistory.filter(h => h.id !== historyId);
+            saveHistoryToStorage();
+            updateHistoryList();
+            showNotification('History entry deleted', 'success');
+        }
+        
+        // Clear all history
+        clearHistoryBtn.addEventListener('click', function() {
+            if (confirm('Are you sure you want to clear all search history?')) {
+                searchHistory = [];
+                saveHistoryToStorage();
+                updateHistoryList();
+                showNotification('Search history cleared', 'success');
+            }
+        });
+        
+        // Update history list in UI
+        function updateHistoryList() {
+            historyList.innerHTML = '';
+            historyStats.textContent = searchHistory.length;
+            
+            if (searchHistory.length === 0) {
+                historyList.innerHTML = '<div class="history-empty"><i class="fas fa-clock"></i><p>No search history yet</p></div>';
+                return;
+            }
+            
+            searchHistory.forEach(entry => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                
+                historyItem.innerHTML = `
+                    <div class="history-info">
+                        <div class="history-date">${entry.date} ${entry.time}</div>
+                        <div class="history-stats">${entry.matchedIPs}/${entry.totalIPs} IPs matched</div>
+                    </div>
+                    <div class="history-actions">
+                        <button class="btn btn-outline btn-sm" onclick="loadHistoryEntry(${entry.id})">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-outline btn-sm" onclick="deleteHistoryEntry(${entry.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                historyList.appendChild(historyItem);
+            });
+        }
         
         // Display results in organized format with filtering
         function displayResults(results, filterTeam = 'all') {
@@ -919,6 +1109,8 @@
         // Make functions globally available for onclick handlers
         window.editTeam = editTeam;
         window.deleteTeam = deleteTeam;
+        window.loadHistoryEntry = loadHistoryEntry;
+        window.deleteHistoryEntry = deleteHistoryEntry;
     </script>
 </body>
 </html>
