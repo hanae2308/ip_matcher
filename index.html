@@ -461,7 +461,7 @@
                 
                 <div class="input-group">
                     <label for="ipInput">IPs to Lookup</label>
-                    <textarea id="ipInput" placeholder="boite extraction"></textarea>
+                    <textarea id="ipInput" placeholder="Paste your IP data here"></textarea>
                 </div>
                 
                 <button class="btn btn-success btn-block" id="matchIPsBtn">
@@ -791,13 +791,23 @@
             });
         }
         
-        // Advanced subject extraction function
+        // Improved subject extraction function for tabular data
         function extractCleanSubject(text) {
+            // For tabular data with multiple columns, extract the subject column
+            const parts = text.split(/\t| {2,}/); // Split by tabs or multiple spaces
+            
+            if (parts.length >= 3) {
+                // Return the third column (subject) if we have multiple columns
+                return parts[2].trim();
+            }
+            
+            // Fallback: try to extract meaningful text
             return text
                 .replace(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/g, '')
                 .replace(/[a-z0-9.-]+\.[a-z]{2,}/gi, '')
                 .replace(/\d{1,2}:\d{2}\s*[AP]M/gi, '')
-                .replace(/[^\w\s]/g, ' ')
+                .replace(/\b(pass|fail)\b/gi, '')
+                .replace(/[^\w\s\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\uFF00-\uFFEF]/g, ' ')
                 .replace(/\s+/g, ' ')
                 .trim();
         }
@@ -817,13 +827,12 @@
                 if (ipMatch) {
                     const ip = ipMatch[1];
                     
-                    let potentialSubject = trimmed.replace(ip, '').replace(/^\s*-?\s*/, '').trim();
+                    // Try to extract subject from the line
+                    let potentialSubject = extractCleanSubject(trimmed);
                     
-                    if (potentialSubject && 
-                        !potentialSubject.match(/^[a-z0-9.-]+\.[a-z]{2,}$/i) && 
-                        !potentialSubject.match(/^\d{1,2}:\d{2}\s*[AP]M$/i) &&
-                        potentialSubject.length > 5) {
-                        currentSubject = extractCleanSubject(potentialSubject);
+                    // Use the subject if it's meaningful
+                    if (potentialSubject && potentialSubject.length > 3) {
+                        currentSubject = potentialSubject;
                     }
                     
                     if (currentSubject) {
@@ -831,10 +840,19 @@
                             subjectMap[currentSubject] = new Set();
                         }
                         subjectMap[currentSubject].add(ip);
+                    } else {
+                        // If no subject found, use a default one
+                        const defaultSubject = 'Unknown Subject';
+                        if (!subjectMap[defaultSubject]) {
+                            subjectMap[defaultSubject] = new Set();
+                        }
+                        subjectMap[defaultSubject].add(ip);
                     }
                 } else {
-                    currentSubject = extractCleanSubject(trimmed);
-                    if (currentSubject && currentSubject.length > 3) {
+                    // This line might be a subject line
+                    const potentialSubject = extractCleanSubject(trimmed);
+                    if (potentialSubject && potentialSubject.length > 3) {
+                        currentSubject = potentialSubject;
                         if (!subjectMap[currentSubject]) {
                             subjectMap[currentSubject] = new Set();
                         }
